@@ -1,0 +1,27 @@
+# Maven build output
+target/
+
+# Gatling results
+.gatling/
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local Maven repository caches
+.m2/
+${env.REPO_HOME}/
+
+# Environment variables
+*.env
+.env*
+
+# Log files
+*.log
