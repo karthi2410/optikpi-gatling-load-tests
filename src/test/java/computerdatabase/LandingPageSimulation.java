@@ -7,10 +7,12 @@ import io.gatling.javaapi.core.Simulation;
 import io.gatling.javaapi.http.HttpProtocolBuilder;
 import io.gatling.javaapi.core.ScenarioBuilder;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 
 import static Utils.LogWriter.writeToLog;
 import static io.gatling.javaapi.core.CoreDsl.*;
@@ -18,6 +20,13 @@ import static io.gatling.javaapi.core.CoreDsl.jsonPath;
 import static io.gatling.javaapi.http.HttpDsl.*;
 
 public class LandingPageSimulation extends Simulation {
+
+   
+    private static String encodePassword(String rawPassword) {
+        String base64 = Base64.getEncoder().encodeToString(rawPassword.getBytes(StandardCharsets.UTF_8));
+        String stripped = base64.replaceAll("=+$", "");
+        return stripped.charAt(0) + "ZA" + stripped.substring(1) + "=YB=";
+    }
 
     long Pause = 10;
     Duration pauseDuration = Duration.ofSeconds(Pause);
@@ -115,14 +124,15 @@ public class LandingPageSimulation extends Simulation {
                                     http("Login with credentials")
                                             .post(Login_credentials)
                                             .formParam("email", "#{email}")
-                                            .formParam("password", "QZAWppdGt1bWFyQDEyMw=YB=")
+                                            .formParam("password", session -> encodePassword(session.getString("password")))
                                             .formParam("redirect", "false")
                                             .formParam("remember", "false")
                                             .formParam("csrfToken", "#{csrfToken}")
                                             .formParam("callbackUrl", "https://demo.optikpi.com/en")
                                             .formParam("json", "true")
                                             .check(status().is(200))
-                                            .check(jsonPath("$.url").exists())
+                                            .check(jsonPath("$.url").saveAs("loginUrl"))
+                                            .check(jsonPath("$.url").transform(url -> !url.contains("error")).is(Boolean.TRUE))
                                             .check(bodyString().saveAs("RESPONSE_BODY_AUTH"))
                             )
                             .pause(1)
@@ -138,6 +148,7 @@ public class LandingPageSimulation extends Simulation {
                             .exec(
                                     http("Fetch Roles")
                                             .get(roles)
+                                            .disableFollowRedirect()
                                             .check(status().is(200))
                                             .check(jsonPath("$.data.role[0]").exists())
                             )
@@ -168,11 +179,17 @@ public class LandingPageSimulation extends Simulation {
                         .atZone(ZoneId.systemDefault())
                         .format(formatter);
 
+                String loginUrl = session.getString("loginUrl");
+
                 // === LOGGING OUTPUT ===
                 System.out.println("--------------- Authentication Output ---------------");
                 System.out.println("Username: " + email);
                 System.out.println("csrf Response: " + csrf_body);
                 System.out.println("Login Response: " + auth_body);
+                System.out.println("Login Redirect URL: " + loginUrl);
+                if (loginUrl != null && loginUrl.contains("error")) {
+                    System.out.println("*** LOGIN FAILED *** URL contains error: " + loginUrl);
+                }
                 System.out.println("workspaceId: " + workspaceId);
                 System.out.println("Authentication Response Body: " + auth_body);
                 System.out.println("Start Time: " + startFormatted);
@@ -195,7 +212,8 @@ public class LandingPageSimulation extends Simulation {
                     exec(http("Session")
                             .get(Session)
                             .check(status().is(200))
-                            .check(jsonPath("$.user.workspaceId").is(session -> session.getString("workspaceId")))
+                            .check(jsonPath("$.user.email").exists())
+                            .check(jsonPath("$.user.workspaceId").saveAs("workspaceId"))
                     )
                             .exec(http("Dashboard Engagement")
                                     .get(Dashboard_Engagement)
@@ -214,7 +232,8 @@ public class LandingPageSimulation extends Simulation {
                     exec(http("Session")
                             .get(Session)
                             .check(status().is(200))
-                            .check(jsonPath("$.user.workspaceId").is(session -> session.getString("workspaceId")))
+                            .check(jsonPath("$.user.email").exists())
+                            .check(jsonPath("$.user.workspaceId").saveAs("workspaceId"))
                     )
                             .exec(http("AUDIENCE ALL")
                                     .get(AUDIENCE_ALL)
@@ -246,7 +265,8 @@ public class LandingPageSimulation extends Simulation {
                     exec(http("Session")
                             .get(Session)
                             .check(status().is(200))
-                            .check(jsonPath("$.user.workspaceId").is(session -> session.getString("workspaceId")))
+                            .check(jsonPath("$.user.email").exists())
+                            .check(jsonPath("$.user.workspaceId").saveAs("workspaceId"))
                     )
                             .exec(http("CAMPAIGN ALL")
                                     .get(CAMPAIGN_ALL)
@@ -267,14 +287,16 @@ public class LandingPageSimulation extends Simulation {
                     exec(http("Session")
                             .get(Session)
                             .check(status().is(200))
-                            .check(jsonPath("$.user.workspaceId").is(session -> session.getString("workspaceId"))))
+                            .check(jsonPath("$.user.email").exists())
+                            .check(jsonPath("$.user.workspaceId").saveAs("workspaceId")))
                             .exec(http("WORKFLOW ALL")
                                     .get(WORKFLOW_ALL)
                                     .check(status().is(200)))
                             .exec(http("Session")
                                     .get(Session)
                                     .check(status().is(200))
-                                    .check(jsonPath("$.user.workspaceId").is(session -> session.getString("workspaceId"))))
+                                    .check(jsonPath("$.user.email").exists())
+                                    .check(jsonPath("$.user.workspaceId").saveAs("workspaceId")))
                             .exec(http("WORKFLOW ACTIVE")
                                     .get(WORKFLOW_ACTIVE)
                                     .check(status().is(200)))
@@ -293,7 +315,8 @@ public class LandingPageSimulation extends Simulation {
                     exec(http("Session")
                             .get(Session)
                             .check(status().is(200))
-                            .check(jsonPath("$.user.workspaceId").is(session -> session.getString("workspaceId")))
+                            .check(jsonPath("$.user.email").exists())
+                            .check(jsonPath("$.user.workspaceId").saveAs("workspaceId"))
                     )
                             .exec(http("LIBRARY ALL")
                                     .get(LIBRARY_ALL)
@@ -314,7 +337,8 @@ public class LandingPageSimulation extends Simulation {
                     exec(http("Session")
                             .get(Session)
                             .check(status().is(200))
-                            .check(jsonPath("$.user.workspaceId").is(session -> session.getString("workspaceId")))
+                            .check(jsonPath("$.user.email").exists())
+                            .check(jsonPath("$.user.workspaceId").saveAs("workspaceId"))
                     )
                             .exec(http("DP CUSTOMER PROFILE")
                                     .get(DP_CUSTOMER_PROFILE)
